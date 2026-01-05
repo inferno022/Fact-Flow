@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Fact, UserProfile, AppTheme, AppView, Feedback, Reply, Deck } from './types';
 import { THEME_COLORS, XP_PER_FACT, XP_FOR_FIRST_LEVEL, LIGHT_GRADIENTS, DARK_GRADIENTS, DECK_COLORS } from './constants';
-import { getFacts } from './services/geminiService';
+import { getFacts } from './services/groqService';
 import { saveUserProfile, createShareLink, getSharedFact, markFactSeen, likeFact, trackFactInSession, loadSeenFactsFromDB } from './services/cacheService';
 import { soundService } from './services/soundService';
 import { initNotificationService } from './services/notificationService';

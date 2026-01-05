@@ -1,13 +1,15 @@
 import { supabase } from './supabaseClient';
 import { Fact, UserProfile } from '../types';
 
-// In-memory tracking of facts shown in current session (prevents duplicates even before DB sync)
+// ULTRA-STRONG duplicate prevention - NEVER show same fact twice EVER
 const sessionSeenFacts = new Set<string>();
-const sessionSeenContent = new Set<string>(); // Track content hash to catch duplicate content with different IDs
-const sessionSeenHashes = new Set<string>(); // Track content similarity hashes
+const sessionSeenContent = new Set<string>(); 
+const sessionSeenHashes = new Set<string>(); 
+const sessionSeenKeywords = new Set<string>(); // Track key phrases
+const sessionSeenNumbers = new Set<string>(); // Track specific numbers/dates
 let dbSeenFactsLoaded = false;
 
-// Enhanced content similarity detection
+// ULTRA-ENHANCED content similarity detection - catches even paraphrased facts
 const createContentHash = (content: string): string => {
   // Remove punctuation, normalize spaces, lowercase
   const normalized = content.toLowerCase()
@@ -15,12 +17,37 @@ const createContentHash = (content: string): string => {
     .replace(/\s+/g, ' ')
     .trim();
   
-  // Create multiple hash variants to catch similar content
-  const words = normalized.split(' ').filter(w => w.length > 3); // Only significant words
-  const sortedWords = [...words].sort().join(' '); // Word order independent
+  // Extract key elements that make facts unique
+  const words = normalized.split(' ').filter(w => w.length > 3);
+  const sortedWords = [...words].sort().join(' ');
   const firstHalf = words.slice(0, Math.ceil(words.length / 2)).join(' ');
+  const lastHalf = words.slice(Math.ceil(words.length / 2)).join(' ');
   
-  return `${normalized.substring(0, 50)}|${sortedWords.substring(0, 50)}|${firstHalf}`;
+  // Extract numbers, dates, and proper nouns (likely to be unique identifiers)
+  const numbers = content.match(/\d+/g) || [];
+  const properNouns = content.match(/[A-Z][a-z]+/g) || [];
+  
+  // Create multiple hash variants for maximum duplicate detection
+  return `${normalized.substring(0, 60)}|${sortedWords.substring(0, 60)}|${firstHalf}|${lastHalf}|${numbers.join(',')}|${properNouns.join(',')}`;
+};
+
+// Extract key phrases that make a fact unique
+const extractKeyPhrases = (content: string): string[] => {
+  const phrases: string[] = [];
+  
+  // Extract numbers with context (e.g., "25 million", "1947", "3.14")
+  const numberMatches = content.match(/\d+[\d,.]*(?: (?:million|billion|trillion|thousand|years?|days?|hours?|minutes?|seconds?|percent|%|degrees?|miles?|kilometers?|feet|meters|inches|pounds|kilograms|tons?))?/gi) || [];
+  phrases.push(...numberMatches);
+  
+  // Extract proper nouns (names, places, organizations)
+  const properNouns = content.match(/[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*/g) || [];
+  phrases.push(...properNouns);
+  
+  // Extract scientific terms and unique phrases
+  const scientificTerms = content.match(/\b(?:DNA|RNA|quantum|neutron|electron|molecule|atom|protein|enzyme|bacteria|virus|galaxy|planet|species|genus)\b/gi) || [];
+  phrases.push(...scientificTerms);
+  
+  return phrases.map(p => p.toLowerCase().trim()).filter(p => p.length > 2);
 };
 
 // Load all seen facts from DB into session memory on startup
@@ -38,22 +65,42 @@ export const loadSeenFactsFromDB = async (userEmail: string): Promise<void> => {
         sessionSeenFacts.add(row.fact_id);
         if (row.content_hash) {
           sessionSeenHashes.add(row.content_hash);
+          
+          // Extract and track key phrases from stored hashes
+          const hashParts = row.content_hash.split('|');
+          if (hashParts.length >= 6) {
+            // Extract numbers and proper nouns from hash
+            const numbers = hashParts[4] ? hashParts[4].split(',') : [];
+            const properNouns = hashParts[5] ? hashParts[5].split(',') : [];
+            
+            numbers.forEach(num => num && sessionSeenNumbers.add(num));
+            properNouns.forEach(noun => noun && sessionSeenKeywords.add(noun.toLowerCase()));
+          }
         }
       });
       dbSeenFactsLoaded = true;
-      console.log(`Loaded ${data.length} seen facts from DB for ${userEmail}`);
+      console.log(`Loaded ${data.length} seen facts with enhanced tracking for ${userEmail}`);
     }
   } catch (e) {
     console.error('Failed to load seen facts:', e);
   }
 };
 
-// Add fact to session tracking with enhanced similarity detection
+// Add fact to session tracking with ULTRA-ENHANCED similarity detection
 export const trackFactInSession = (fact: Fact) => {
   sessionSeenFacts.add(fact.id);
+  
   const contentHash = createContentHash(fact.content);
   sessionSeenContent.add(contentHash);
   sessionSeenHashes.add(contentHash);
+  
+  // Track key phrases that make this fact unique
+  const keyPhrases = extractKeyPhrases(fact.content);
+  keyPhrases.forEach(phrase => sessionSeenKeywords.add(phrase));
+  
+  // Track numbers/dates for ultra-precise duplicate detection
+  const numbers = fact.content.match(/\d+/g) || [];
+  numbers.forEach(num => sessionSeenNumbers.add(num));
 };
 
 // Simple content hash for duplicate detection (legacy)
@@ -61,31 +108,76 @@ const hashContent = (content: string): string => {
   return content.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 50);
 };
 
-// Enhanced fact similarity detection
+// ULTRA-ENHANCED fact similarity detection - catches everything
 const isFactSeen = (factId: string, content: string, seenFactIds: string[]): boolean => {
-  // Check session memory first (fastest) - includes DB facts loaded at startup
+  // 1. Check session memory first (fastest) - includes DB facts loaded at startup
   if (sessionSeenFacts.has(factId)) return true;
   
-  // Check enhanced content similarity
+  // 2. Check enhanced content similarity
   const contentHash = createContentHash(content);
   if (sessionSeenHashes.has(contentHash)) return true;
   
-  // Check legacy content hash
+  // 3. Check legacy content hash
   if (sessionSeenContent.has(hashContent(content))) return true;
   
-  // Check DB records (backup)
+  // 4. Check DB records (backup)
   if (seenFactIds.includes(factId)) return true;
   
-  // Additional similarity check - if content is very similar to any seen fact
+  // 5. ULTRA-PRECISE: Check key phrases overlap
+  const keyPhrases = extractKeyPhrases(content);
+  for (const phrase of keyPhrases) {
+    if (sessionSeenKeywords.has(phrase)) {
+      console.log(`Blocked duplicate fact due to key phrase: "${phrase}"`);
+      return true; // Same key phrase = likely duplicate
+    }
+  }
+  
+  // 6. Check number/date overlap (very specific facts often share unique numbers)
+  const numbers = content.match(/\d+/g) || [];
+  for (const num of numbers) {
+    if (sessionSeenNumbers.has(num) && num.length >= 3) { // Only check significant numbers
+      // Additional context check - if number appears with similar context, it's likely duplicate
+      const numContext = content.toLowerCase().substring(
+        Math.max(0, content.toLowerCase().indexOf(num) - 20),
+        content.toLowerCase().indexOf(num) + num.length + 20
+      );
+      
+      // Check if this number context is too similar to seen facts
+      for (const seenHash of sessionSeenHashes) {
+        if (seenHash.includes(num) && seenHash.includes(numContext.substring(0, 10))) {
+          console.log(`Blocked duplicate fact due to number context: "${num}" in "${numContext}"`);
+          return true;
+        }
+      }
+    }
+  }
+  
+  // 7. Semantic similarity check - if content is very similar to any seen fact
   const normalizedContent = content.toLowerCase().replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ');
   for (const seenHash of sessionSeenHashes) {
     const [seenNormalized] = seenHash.split('|');
-    if (seenNormalized && normalizedContent.includes(seenNormalized.substring(0, 30))) {
-      return true; // Too similar to a seen fact
+    if (seenNormalized && normalizedContent.length > 30 && seenNormalized.length > 30) {
+      // Calculate similarity ratio
+      const similarity = calculateSimilarity(normalizedContent, seenNormalized);
+      if (similarity > 0.7) { // 70% similarity threshold
+        console.log(`Blocked duplicate fact due to high similarity: ${similarity.toFixed(2)}`);
+        return true;
+      }
     }
   }
   
   return false;
+};
+
+// Calculate text similarity ratio
+const calculateSimilarity = (text1: string, text2: string): number => {
+  const words1 = new Set(text1.split(' ').filter(w => w.length > 3));
+  const words2 = new Set(text2.split(' ').filter(w => w.length > 3));
+  
+  const intersection = new Set([...words1].filter(w => words2.has(w)));
+  const union = new Set([...words1, ...words2]);
+  
+  return union.size > 0 ? intersection.size / union.size : 0;
 };
 
 // Load facts user hasn't seen yet - STRICT no duplicates

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Fact Flow</string>
+    <string name="title_activity_main">Fact Flow</string>
+    <string name="package_name">io.factflow.app</string>
+    <string name="custom_url_scheme">io.factflow.app</string>
+</resources>

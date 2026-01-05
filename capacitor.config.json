@@ -1,0 +1,20 @@
+
+{
+  "appId": "io.factflow.app",
+  "appName": "Fact Flow",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "App": {
+      "appUrlOpen": {
+        "handlers": [
+          {
+            "url": "https://factflow.app/f/*"
+          }
+        ]
+      }
+    }
+  }
+}

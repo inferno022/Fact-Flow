@@ -1,0 +1,8 @@
+{
+  "apps": [
+    {
+      "appId": "io.factflow.app",
+      "root": "."
+    }
+  ]
+}

@@ -6,12 +6,12 @@ Fact Flow is an addictive, gamified mobile app that delivers fascinating facts t
 
 ## ✨ Features
 
-- 🤖 **AI-Generated Facts**: Powered by Google Gemini for truly unique, obscure facts
+- 🤖 **AI-Generated Facts**: Powered by Groq's Llama 3.3 for ultra-unique, recent facts
 - 🎮 **Gamification**: XP system, levels, streaks, and achievements
 - 💰 **Monetization**: AdMob integration with interstitial ads
 - 🔔 **Smart Notifications**: Miss-you reminders and streak milestones
 - 📱 **Native Mobile**: Built with Capacitor for iOS and Android
-- 🎯 **Personalization**: Never see the same fact twice
+- 🎯 **Zero Duplicates**: Advanced 7-layer duplicate prevention system
 - 🔒 **Secure**: Comprehensive security hardening
 - 📊 **Analytics**: User engagement tracking
 
@@ -20,7 +20,7 @@ Fact Flow is an addictive, gamified mobile app that delivers fascinating facts t
 - **Frontend**: React 19, TypeScript, Tailwind CSS
 - **Mobile**: Capacitor 6, Ionic Framework
 - **Backend**: Supabase (PostgreSQL, Auth, Real-time)
-- **AI**: Google Gemini 2.0 Flash
+- **AI**: Groq Llama 3.3 (70B parameters)
 - **Monetization**: Google AdMob
 - **Build**: Vite, Ionic Appflow
 
@@ -34,7 +34,8 @@ Fact Flow is an addictive, gamified mobile app that delivers fascinating facts t
 - Node.js 18+
 - Android Studio (for Android builds)
 - Supabase account
-- Google Gemini API key
+- Groq API key (primary)
+- Google Gemini API key (backup)
 - AdMob account
 
 ### Installation
@@ -72,7 +73,8 @@ Fact Flow is an addictive, gamified mobile app that delivers fascinating facts t
 
 ### Environment Variables
 ```env
-VITE_GEMINI_API_KEY=your_gemini_api_key
+VITE_GROQ_API_KEY=your_groq_api_key
+VITE_GEMINI_API_KEY=your_gemini_api_key_backup
 ```
 
 ### Supabase Setup

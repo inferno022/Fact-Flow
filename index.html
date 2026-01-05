@@ -41,10 +41,12 @@
             overflow-y: scroll;
             scrollbar-width: none;
             -webkit-overflow-scrolling: touch;
+            scroll-behavior: smooth;
         }
         .snap-y-container::-webkit-scrollbar { display: none; }
         .snap-item {
-            scroll-snap-align: start;
+            scroll-snap-align: center;
+            scroll-snap-stop: always;
             height: 100vh;
             position: relative;
         }

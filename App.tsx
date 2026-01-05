@@ -301,8 +301,15 @@ const App: React.FC = () => {
 
   const handleScroll = useCallback(() => {
     if (!feedRef.current || (view !== 'feed' && view !== 'explore')) return;
-    const index = Math.round(feedRef.current.scrollTop / window.innerHeight);
-    if (index !== currentIndex) {
+    
+    // Improved scroll detection with threshold to prevent oversensitive scrolling
+    const scrollTop = feedRef.current.scrollTop;
+    const threshold = window.innerHeight * 0.3; // 30% threshold
+    const rawIndex = scrollTop / window.innerHeight;
+    const index = Math.round(rawIndex);
+    
+    // Only change if we've scrolled past the threshold
+    if (Math.abs(rawIndex - index) < 0.3 && index !== currentIndex) {
       setCurrentIndex(index);
       triggerHaptic('light');
       

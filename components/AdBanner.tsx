@@ -53,32 +53,44 @@ export const AdBanner: React.FC<AdBannerProps> = ({
   );
 };
 
-// Full-screen ad card for feed - shows placeholder on web/localhost
+// Full-screen ad card for feed - shows placeholder on web/localhost, real ads on production
 export const FeedAd: React.FC<{ adSlot: string }> = ({ adSlot }) => {
   const adRef = useRef<HTMLDivElement>(null);
   const isAdLoaded = useRef(false);
-  const [adFailed, setAdFailed] = useState(false);
+  const [showPlaceholder, setShowPlaceholder] = useState(false);
 
   useEffect(() => {
-    if (isAdLoaded.current || isNative) return;
+    if (isNative) return; // Native uses interstitial ads
+    
+    // Check if we're on localhost or production
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    
+    if (isLocalhost) {
+      setShowPlaceholder(true);
+      return;
+    }
     
     try {
       if (typeof window !== 'undefined' && (window as any).adsbygoogle) {
         (window as any).adsbygoogle.push({});
         isAdLoaded.current = true;
+        
+        // Check if ad loaded after delay
+        setTimeout(() => {
+          if (adRef.current) {
+            const adElement = adRef.current.querySelector('.adsbygoogle');
+            if (adElement && adElement.innerHTML.trim() === '') {
+              setShowPlaceholder(true);
+            }
+          }
+        }, 3000);
       } else {
-        // No AdSense available (localhost/dev)
-        setAdFailed(true);
+        setShowPlaceholder(true);
       }
     } catch (e) {
       console.error('AdSense error:', e);
-      setAdFailed(true);
+      setShowPlaceholder(true);
     }
-    
-    // Check if ad loaded after a delay
-    setTimeout(() => {
-      if (!isAdLoaded.current) setAdFailed(true);
-    }, 2000);
   }, []);
 
   // On native, this component won't show (interstitials are used instead)
@@ -105,18 +117,21 @@ export const FeedAd: React.FC<{ adSlot: string }> = ({ adSlot }) => {
       
       {/* Ad container or placeholder */}
       <div className="relative z-10 w-full px-6 flex-1 flex items-center justify-center">
-        {adFailed ? (
-          // Placeholder when ads can't load (localhost/dev)
+        {showPlaceholder ? (
+          // Enhanced placeholder for development/fallback
           <div className="text-center">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-white/10 flex items-center justify-center">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5" opacity="0.5">
+            <div className="w-20 h-20 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center border border-white/10">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.5" opacity="0.6">
                 <rect x="3" y="3" width="18" height="18" rx="2"/>
                 <path d="M3 9h18"/>
                 <path d="M9 21V9"/>
               </svg>
             </div>
-            <p className="text-white/40 text-sm font-bold">Ad Space</p>
-            <p className="text-white/20 text-[10px] mt-1">Ads appear on published app</p>
+            <p className="text-white/60 text-lg font-bold mb-2">Ad Space</p>
+            <p className="text-white/30 text-sm">Real ads show on published app</p>
+            <div className="mt-4 px-4 py-2 bg-white/5 rounded-full">
+              <p className="text-white/20 text-xs">AdMob ID: {adSlot}</p>
+            </div>
           </div>
         ) : (
           <ins

@@ -17,7 +17,10 @@ export const NavBar: React.FC<NavBarProps> = ({ theme, currentView, onViewChange
     
     return (
       <button 
-        onClick={() => onViewChange(view)}
+        onClick={() => {
+          console.log('Navigation clicked:', view);
+          onViewChange(view);
+        }}
         className="relative flex flex-col items-center justify-center h-full flex-1 group"
       >
         <div className={`relative z-10 transition-all duration-300 ${active ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'}`}>

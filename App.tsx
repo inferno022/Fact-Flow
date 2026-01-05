@@ -10,6 +10,7 @@ import { initAdMob, showInterstitialAd } from './services/adService';
 import { FeedAd } from './components/AdBanner';
 import { NavBar } from './components/NavBar';
 import { AuthScreen } from './components/AuthScreen';
+import { initMobileConfig } from './config/mobile';
 
 import { FeedbackBoard } from './components/FeedbackBoard';
 
@@ -62,7 +63,13 @@ const BackgroundPattern = () => (
 
 const App: React.FC = () => {
   const [theme, setTheme] = useState<AppTheme>(() => localStorage.getItem('fact-theme') as AppTheme || 'dark');
-  const [view, setView] = useState<AppView>('auth');
+  const [view, setViewState] = useState<AppView>('auth');
+  
+  // Debug wrapper for setView
+  const setView = (newView: AppView) => {
+    console.log('View change:', { from: view, to: newView });
+    setViewState(newView);
+  };
   const [facts, setFacts] = useState<Fact[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [user, setUser] = useState<UserProfile>(() => {
@@ -118,6 +125,9 @@ const App: React.FC = () => {
 
   // Splash screen with intro sound using Howler
   useEffect(() => {
+    // Initialize mobile configuration
+    initMobileConfig();
+    
     // Play intro sound and get duration
     const duration = soundService.playIntro();
     
@@ -362,6 +372,7 @@ const App: React.FC = () => {
   }, [currentIndex, facts, loading, view, user.email, scrollTimeout]);
 
   const handleAuth = (username: string, email: string) => {
+      console.log('Authentication successful', { username, email });
       setUser(u => ({ ...u, username, email, isAuthenticated: true }));
       setView('feed'); // Go directly to feed
   };

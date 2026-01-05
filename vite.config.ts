@@ -26,7 +26,7 @@ export default defineConfig(({ mode }) => {
         }
       },
       esbuild: {
-        drop: ['console', 'debugger'],
+        drop: mode === 'production' ? ['debugger'] : [], // Keep console logs for debugging
       },
       plugins: [react()],
       define: {

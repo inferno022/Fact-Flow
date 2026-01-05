@@ -19,11 +19,12 @@ export const initAdMob = async (): Promise<void> => {
   if (isInitialized) return;
   
   try {
+    console.log('Initializing AdMob...', { isProduction, appId: ADMOB_CONFIG.appId });
     await AdMob.initialize({
       initializeForTesting: !isProduction,
     });
     isInitialized = true;
-    console.log('AdMob initialized');
+    console.log('AdMob initialized successfully');
     
     // Preload first interstitial
     await prepareInterstitial();
@@ -34,11 +35,13 @@ export const initAdMob = async (): Promise<void> => {
 
 export const prepareInterstitial = async (): Promise<void> => {
   try {
+    const adId = getAdUnitId();
+    console.log('Preparing interstitial ad...', { adId, isProduction });
     await AdMob.prepareInterstitial({
-      adId: getAdUnitId(),
+      adId: adId,
       isTesting: !isProduction,
     });
-    console.log('Interstitial ad prepared');
+    console.log('Interstitial ad prepared successfully');
   } catch (error) {
     console.error('Failed to prepare interstitial:', error);
   }
@@ -46,8 +49,10 @@ export const prepareInterstitial = async (): Promise<void> => {
 
 export const showInterstitialAd = async (): Promise<boolean> => {
   try {
+    console.log('Attempting to show interstitial ad...');
     await AdMob.showInterstitial();
     adLoadedCount++;
+    console.log('Interstitial ad shown successfully', { adCount: adLoadedCount });
     
     // Prepare next ad
     setTimeout(() => prepareInterstitial(), 1000);

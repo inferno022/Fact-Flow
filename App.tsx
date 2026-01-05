@@ -299,43 +299,67 @@ const App: React.FC = () => {
     });
   };
 
+  const [scrollTimeout, setScrollTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [isScrolling, setIsScrolling] = useState(false);
+
   const handleScroll = useCallback(() => {
     if (!feedRef.current || (view !== 'feed' && view !== 'explore')) return;
     
-    // Improved scroll detection with threshold to prevent oversensitive scrolling
-    const scrollTop = feedRef.current.scrollTop;
-    const threshold = window.innerHeight * 0.3; // 30% threshold
-    const rawIndex = scrollTop / window.innerHeight;
-    const index = Math.round(rawIndex);
+    setIsScrolling(true);
     
-    // Only change if we've scrolled past the threshold
-    if (Math.abs(rawIndex - index) < 0.3 && index !== currentIndex) {
-      setCurrentIndex(index);
-      triggerHaptic('light');
-      
-      const viewedFact = facts[index];
-      if (viewedFact && !viewedFact.isAd) {
-         // Mark fact as seen in session + Supabase (prevents showing again)
-         if (user.email) {
-           markFactSeen(viewedFact.id, user.email, viewedFact.content);
-         } else {
-           // Even without email, track in session
-           trackFactInSession(viewedFact);
-         }
-      }
-
-      // Show interstitial ad every 8 facts on native
-      if (index > 0 && index % 8 === 0 && !viewedFact?.isAd) {
-        showInterstitialAd();
-      }
-
-      if (index >= facts.length - 3) loadMoreFacts();
-      if (facts[index] && !facts[index].xpEarned) {
-        setFacts(p => p.map((f, idx) => idx === index ? { ...f, xpEarned: true } : f));
-        addXP(XP_PER_FACT);
-      }
+    // Clear existing timeout
+    if (scrollTimeout) {
+      clearTimeout(scrollTimeout);
     }
-  }, [currentIndex, facts, loading, view, user.email]);
+    
+    // Set new timeout to detect scroll end
+    const newTimeout = setTimeout(() => {
+      if (!feedRef.current) return;
+      
+      const scrollTop = feedRef.current.scrollTop;
+      const index = Math.round(scrollTop / window.innerHeight);
+      
+      // Force snap to exact position
+      const targetScrollTop = index * window.innerHeight;
+      if (Math.abs(scrollTop - targetScrollTop) > 10) {
+        feedRef.current.scrollTo({
+          top: targetScrollTop,
+          behavior: 'auto'
+        });
+      }
+      
+      if (index !== currentIndex) {
+        setCurrentIndex(index);
+        triggerHaptic('light');
+        
+        const viewedFact = facts[index];
+        if (viewedFact && !viewedFact.isAd) {
+           // Mark fact as seen in session + Supabase (prevents showing again)
+           if (user.email) {
+             markFactSeen(viewedFact.id, user.email, viewedFact.content);
+           } else {
+             // Even without email, track in session
+             trackFactInSession(viewedFact);
+           }
+        }
+
+        // Show interstitial ad every 8 facts on native
+        if (index > 0 && index % 8 === 0 && !viewedFact?.isAd) {
+          showInterstitialAd();
+        }
+
+        if (index >= facts.length - 3) loadMoreFacts();
+        if (facts[index] && !facts[index].xpEarned) {
+          setFacts(p => p.map((f, idx) => idx === index ? { ...f, xpEarned: true } : f));
+          addXP(XP_PER_FACT);
+        }
+      }
+      
+      setIsScrolling(false);
+    }, 100); // 100ms delay for snap detection
+    
+    setScrollTimeout(newTimeout);
+  }, [currentIndex, facts, loading, view, user.email, scrollTimeout]);
 
   const handleAuth = (username: string, email: string) => {
       setUser(u => ({ ...u, username, email, isAuthenticated: true }));

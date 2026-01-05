@@ -4,7 +4,24 @@ import { Fact, UserProfile } from '../types';
 // In-memory tracking of facts shown in current session (prevents duplicates even before DB sync)
 const sessionSeenFacts = new Set<string>();
 const sessionSeenContent = new Set<string>(); // Track content hash to catch duplicate content with different IDs
+const sessionSeenHashes = new Set<string>(); // Track content similarity hashes
 let dbSeenFactsLoaded = false;
+
+// Enhanced content similarity detection
+const createContentHash = (content: string): string => {
+  // Remove punctuation, normalize spaces, lowercase
+  const normalized = content.toLowerCase()
+    .replace(/[^\w\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  
+  // Create multiple hash variants to catch similar content
+  const words = normalized.split(' ').filter(w => w.length > 3); // Only significant words
+  const sortedWords = [...words].sort().join(' '); // Word order independent
+  const firstHalf = words.slice(0, Math.ceil(words.length / 2)).join(' ');
+  
+  return `${normalized.substring(0, 50)}|${sortedWords.substring(0, 50)}|${firstHalf}`;
+};
 
 // Load all seen facts from DB into session memory on startup
 export const loadSeenFactsFromDB = async (userEmail: string): Promise<void> => {
@@ -13,11 +30,16 @@ export const loadSeenFactsFromDB = async (userEmail: string): Promise<void> => {
   try {
     const { data } = await supabase
       .from('user_seen_facts')
-      .select('fact_id')
+      .select('fact_id, content_hash')
       .eq('user_email', userEmail);
     
     if (data) {
-      data.forEach(row => sessionSeenFacts.add(row.fact_id));
+      data.forEach(row => {
+        sessionSeenFacts.add(row.fact_id);
+        if (row.content_hash) {
+          sessionSeenHashes.add(row.content_hash);
+        }
+      });
       dbSeenFactsLoaded = true;
       console.log(`Loaded ${data.length} seen facts from DB for ${userEmail}`);
     }
@@ -26,24 +48,43 @@ export const loadSeenFactsFromDB = async (userEmail: string): Promise<void> => {
   }
 };
 
-// Add fact to session tracking
+// Add fact to session tracking with enhanced similarity detection
 export const trackFactInSession = (fact: Fact) => {
   sessionSeenFacts.add(fact.id);
-  sessionSeenContent.add(hashContent(fact.content));
+  const contentHash = createContentHash(fact.content);
+  sessionSeenContent.add(contentHash);
+  sessionSeenHashes.add(contentHash);
 };
 
-// Simple content hash for duplicate detection
+// Simple content hash for duplicate detection (legacy)
 const hashContent = (content: string): string => {
   return content.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 50);
 };
 
-// Check if fact was already shown (in session or DB)
+// Enhanced fact similarity detection
 const isFactSeen = (factId: string, content: string, seenFactIds: string[]): boolean => {
   // Check session memory first (fastest) - includes DB facts loaded at startup
   if (sessionSeenFacts.has(factId)) return true;
+  
+  // Check enhanced content similarity
+  const contentHash = createContentHash(content);
+  if (sessionSeenHashes.has(contentHash)) return true;
+  
+  // Check legacy content hash
   if (sessionSeenContent.has(hashContent(content))) return true;
+  
   // Check DB records (backup)
   if (seenFactIds.includes(factId)) return true;
+  
+  // Additional similarity check - if content is very similar to any seen fact
+  const normalizedContent = content.toLowerCase().replace(/[^\w\s]/g, ' ').replace(/\s+/g, ' ');
+  for (const seenHash of sessionSeenHashes) {
+    const [seenNormalized] = seenHash.split('|');
+    if (seenNormalized && normalizedContent.includes(seenNormalized.substring(0, 30))) {
+      return true; // Too similar to a seen fact
+    }
+  }
+  
   return false;
 };
 
@@ -122,19 +163,24 @@ export const markFactSeen = async (factId: string, userEmail: string, content?: 
   // Always track in session memory (instant, no DB delay)
   sessionSeenFacts.add(factId);
   if (content) {
-    sessionSeenContent.add(hashContent(content));
+    const contentHash = createContentHash(content);
+    sessionSeenContent.add(hashContent(content)); // Legacy
+    sessionSeenHashes.add(contentHash); // Enhanced
   }
   
   // Also persist to DB for cross-session tracking
   if (!userEmail) return;
   try {
+    const contentHash = content ? createContentHash(content) : null;
     await supabase.from('user_seen_facts').upsert({
       user_email: userEmail,
       fact_id: factId,
+      content_hash: contentHash,
       seen_at: new Date().toISOString()
     }, { onConflict: 'user_email,fact_id' });
   } catch (e) {
     // Silent fail - session tracking still works
+    console.error('Failed to mark fact as seen in DB:', e);
   }
 };
 
